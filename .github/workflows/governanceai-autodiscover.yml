@@ -1,0 +1,61 @@
+name: Governance AI Auto Discover
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: Auto-discover job id emitted by GovernanceAI
+        required: true
+        type: string
+      repository_limit:
+        description: Optional limit for smoke tests
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GOVERNANCE_AI_API_URL: http://127.0.0.1:8001
+  GOVERNANCE_AI_PROJECT_SLUG: governance
+  GOVERNANCE_AI_AUTODISCOVER_PROVIDER: github
+
+jobs:
+  autodiscover:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Request autodiscover image access
+        env:
+          GOVERNANCE_AI_TOKEN: ${{ secrets.GOVERNANCE_AI_AUTODISCOVER_TOKEN }}
+        run: |
+          curl --fail-with-body -sS -X POST "$GOVERNANCE_AI_API_URL/v1/pipeline-scans/autodiscover/image-access" \
+            -H "Authorization: Bearer $GOVERNANCE_AI_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"project_slug\":\"$GOVERNANCE_AI_PROJECT_SLUG\",\"provider\":\"github\",\"repository\":\"${{ github.repository }}\",\"repository_id\":\"${{ github.repository_id }}\"}" \
+            > autodiscover-image-access.json
+
+      - name: Log in to private autodiscover registry
+        env:
+          GOVERNANCE_AI_TOKEN: ${{ secrets.GOVERNANCE_AI_AUTODISCOVER_TOKEN }}
+        run: |
+          export AUTODISCOVER_REGISTRY=$(python -c "import json; print(json.load(open('autodiscover-image-access.json'))['registry'])")
+          export AUTODISCOVER_USERNAME=$(python -c "import json; print(json.load(open('autodiscover-image-access.json'))['username'])")
+          export AUTODISCOVER_PASSWORD=$(python -c "import json; print(json.load(open('autodiscover-image-access.json'))['password'])")
+          echo "$AUTODISCOVER_PASSWORD" | docker login "$AUTODISCOVER_REGISTRY" -u "$AUTODISCOVER_USERNAME" --password-stdin
+
+      - name: Run autodiscover controller image
+        env:
+          GOVERNANCE_AI_TOKEN: ${{ secrets.GOVERNANCE_AI_AUTODISCOVER_TOKEN }}
+        run: |
+          export AUTODISCOVER_IMAGE=$(python -c "import json; print(json.load(open('autodiscover-image-access.json'))['image'])")
+          docker pull "$AUTODISCOVER_IMAGE"
+          docker run --rm \
+            -e GOVERNANCE_AI_API_URL="$GOVERNANCE_AI_API_URL" \
+            -e GOVERNANCE_AI_PROJECT_SLUG="$GOVERNANCE_AI_PROJECT_SLUG" \
+            -e GOVERNANCE_AI_TOKEN="$GOVERNANCE_AI_TOKEN" \
+            -e GOVERNANCE_AI_AUTODISCOVER_JOB_ID="${{ inputs.job_id }}" \
+            -e GOVERNANCE_AI_AUTODISCOVER_PROVIDER="$GOVERNANCE_AI_AUTODISCOVER_PROVIDER" \
+            -e GOVERNANCE_AI_AUTODISCOVER_REPOSITORY_LIMIT="${{ inputs.repository_limit }}" \
+            "$AUTODISCOVER_IMAGE" run
