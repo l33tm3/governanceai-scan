@@ -51,11 +51,31 @@ jobs:
         run: |
           export AUTODISCOVER_IMAGE=$(python -c "import json; print(json.load(open('autodiscover-image-access.json'))['image'])")
           docker pull "$AUTODISCOVER_IMAGE"
+          mkdir -p autodiscover-artifacts
           docker run --rm \
+            -v "$PWD/autodiscover-artifacts:/artifacts" \
             -e GOVERNANCE_AI_API_URL="$GOVERNANCE_AI_API_URL" \
             -e GOVERNANCE_AI_PROJECT_SLUG="$GOVERNANCE_AI_PROJECT_SLUG" \
             -e GOVERNANCE_AI_TOKEN="$GOVERNANCE_AI_TOKEN" \
             -e GOVERNANCE_AI_AUTODISCOVER_JOB_ID="${{ inputs.job_id }}" \
             -e GOVERNANCE_AI_AUTODISCOVER_PROVIDER="$GOVERNANCE_AI_AUTODISCOVER_PROVIDER" \
             -e GOVERNANCE_AI_AUTODISCOVER_REPOSITORY_LIMIT="${{ inputs.repository_limit }}" \
+            -e GOVERNANCE_AI_AUTODISCOVER_ARTIFACT_DIR="/artifacts" \
             "$AUTODISCOVER_IMAGE" run
+
+      - name: Publish autodiscover summary
+        if: always()
+        run: |
+          if [ -f autodiscover-artifacts/autodiscover-summary.md ]; then
+            cat autodiscover-artifacts/autodiscover-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No autodiscover summary was generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload autodiscover artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: governanceai-autodiscover-${{ inputs.job_id }}
+          path: autodiscover-artifacts
+          if-no-files-found: warn
