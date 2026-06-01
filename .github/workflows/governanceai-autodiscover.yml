@@ -1,10 +1,10 @@
-name: Governance AI Auto Discover
+name: ARGORIX Auto Discover
 
 on:
   workflow_dispatch:
     inputs:
       job_id:
-        description: Auto-discover job id emitted by GovernanceAI
+        description: Auto-discover job id emitted by ARGORIX
         required: true
         type: string
       repository_limit:
