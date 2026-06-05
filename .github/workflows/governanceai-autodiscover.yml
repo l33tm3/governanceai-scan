@@ -17,8 +17,8 @@ permissions:
   id-token: write
 
 env:
-  GOVERNANCE_AI_API_URL: https://nummular-nonidyllic-jayla.ngrok-free.dev
-  GOVERNANCE_AI_PROJECT_SLUG: governance
+  GOVERNANCE_AI_API_URL: https://api.argorix.com
+  GOVERNANCE_AI_PROJECT_SLUG: argorix
   GOVERNANCE_AI_AUTODISCOVER_PROVIDER: github
 
 jobs:
